@@ -10,14 +10,14 @@ const SB = process.env.SUPABASE_URL || 'https://qhcponrxumfnomkgverb.supabase.co
 const ANON = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoY3BvbnJ4dW1mbm9ta2d2ZXJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMDMyNzUsImV4cCI6MjEwNTc3OTI3NX0.PWiYx_f-yPLgdCQRz12cU4IazliOhb6W7klWTnGqT_U';
 const SVC = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const KIND = {
-  quick: 'Give a short, direct answer.',
+  quick: 'Answer in 2 to 5 sentences. No headings or lists unless truly needed.',
   teach: 'Teach the student so they truly understand. Explain simply from the basics, build step by step with everyday examples, then end with 3 short questions to test understanding, with the answers listed after.',
-  essay: 'Write a well-structured academic essay with an introduction, body and conclusion.',
-  research: 'Give a research-style answer with background, key ideas and suggested sources. Only name real, well-known sources and say when unsure.',
-  science: 'Explain scientifically with clear steps, units and formulas.',
+  essay: 'Write a well-structured essay in flowing paragraphs: introduction, body and conclusion. No bullet points or tables.',
+  research: 'Use short headings (background, key ideas, debates, suggested sources) with mostly prose. Only name real, well-known sources and say when unsure.',
+  science: 'Explain the science clearly in plain steps. Show formulas only if the question truly needs them.',
   calc: 'Solve step by step and show the working.',
   case: 'Analyse the case: context, issues, options and a recommendation.',
-  report: 'Write in a clear academic report style with headings.',
+  report: 'Write in a clear academic report style with headings that fit the topic.',
   summary: 'Summarise the text accurately and briefly.',
   image: 'The text was read from a student\'s image of notes or a diagram. Interpret it and answer.'
 };
@@ -25,8 +25,14 @@ const KCOST = { quick: 0, summary: 1, calc: 2, teach: 3, science: 3, image: 3, e
 const TASK = {
   brainstorm: 'Give topic outlines, thesis ideas and literature angles.',
   audit: 'Review the text for logical flow and citation problems. List the issues, then suggest fixes.',
-  expand: 'Expand the answer in much more depth.'
+  expand: 'Expand the answer in much more depth.',
+  translate: 'Translate the text faithfully into the target language, keeping headings, lists, tables and formulas. Do not add or remove content.'
 };
+const TONES = {
+  '9ja': 'Write in simple, clear and correct English with easy everyday words and short sentences, for a student who finds English hard. Explain any difficult word.',
+  foreign: 'Write in sophisticated, highly grammatical, well-structured academic English with precise vocabulary.'
+};
+const LANGS = ["English", "Yoruba", "Igbo", "Hausa", "Nigerian Pidgin", "Mandarin Chinese", "Spanish", "French", "German", "Portuguese", "Arabic", "Hebrew", "Greek", "Hindi", "Russian", "Japanese", "Korean", "Swahili", "Italian", "Turkish"];
 const STYLES = ['Open with a real-life example.', 'Start from the core idea, then build outward.', 'Use an analogy to explain the main point.', 'Organise it as problem, method, then result.', 'Begin with a common misunderstanding and correct it.'];
 const json = (o, s = 200) => Response.json(o, { status: s });
 // Same fingerprint method as the page
@@ -99,12 +105,14 @@ export default async (req) => {
       return json({ duplicate: true, error: 'Similar question detected within your department.' }, 409);
   }
 
+  const lang = LANGS.includes(p.lang) ? p.lang : 'English';
+  const langLine = lang === 'English' ? (p.task === 'translate' ? ' The target language is English.' : '') : ' Write the whole answer in ' + lang + ' using its proper script' + (['Yoruba', 'Igbo'].includes(lang) ? ' and correct tone marks' : '') + '. Keep formulas and technical terms accurate and give the English term in brackets the first time. ';
   const system = 'You are QuikAz, an academic assistant for university students. ' + (KIND[p.kind] || KIND.quick) + ' ' + (TASK[p.task] || '') +
     (p.mode === 'advanced' ? ' Be in-depth with background context.' : ' Be concise and direct.') +
-    ' The student is in ' + (p.level || '100') + ' level, so match the depth and vocabulary. ' + STYLES[Math.floor(Math.random() * STYLES.length)] +
-    ' Use your own wording, structure and examples so no two students get the same text. Format with Markdown (## headings, - lists, | tables |). Write maths in LaTeX between $ signs. Never invent citations. Help the student understand.';
+    ' The student is in ' + (p.level || '100') + ' level, so match the depth and vocabulary. ' + (TONES[p.tone] ? TONES[p.tone] + ' ' : '') + langLine + STYLES[Math.floor(Math.random() * STYLES.length)] +
+    ' Use your own wording, structure and examples so no two students get the same text. Match the length and format to the type of work; if the question is easy, keep the answer simple. Use Markdown only when it helps: headings for long answers, tables only for real comparisons. Only use maths notation when the question is mathematical; otherwise include no formulas or equations. When you do use maths, write it in LaTeX between $ signs. Never invent citations. Help the student understand.';
   let answer = '';
-  try { answer = await callAI(p, text, system, p.mode === 'advanced' || p.task === 'expand' ? 3000 : 1500); }
+  try { answer = await callAI(p, text, system, Math.round((p.mode === 'advanced' || p.task === 'expand' ? 3000 : 1500) * (lang !== 'English' ? 1.5 : 1))); }
   catch (e) { return json({ error: e.message || 'The AI is not available right now.' }, e.code === 429 ? 429 : 502); }
   if (!answer.trim()) return json({ error: 'The AI gave no answer. Try rephrasing.' }, 502);
 
