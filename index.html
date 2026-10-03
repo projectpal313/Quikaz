@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuikAz — your AI study assistant</title>
+<meta property="og:title" content="QuikAz — your AI study assistant">
+<meta property="og:description" content="Essays, research, science and quick answers for university students.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="quikaz.css">
+</head>
+<body>
+<div class="app">
+  <nav class="side" id="side" aria-label="Main">
+    <div class="brand">QuikAz</div>
+    <a class="on" href="quikaz.html" aria-current="page">QuikAz</a>
+    <button class="btn ghost" id="logout">Log out</button>
+    <label class="dept">Your department<input id="dept" placeholder="e.g. Guidance and Counselling"></label>
+  </nav>
+  <div>
+    <header class="top">
+      <button class="menu" id="menu" aria-label="Open menu">Menu</button>
+      <span class="chip">QuikAz Credits <b id="cr">150</b></span>
+      <span class="chip">AutoCAD Units <b id="cad">0</b></span>
+      <button class="btn ghost" id="share">Share</button>
+      <button class="btn" id="buy">Buy AutoCAD Units</button>
+    </header>
+    <main>
+      <section class="card" id="studio">
+        <h2>Query studio</h2>
+        <div class="row">
+          <div class="seg" id="modes"><button class="on" data-m="basic">Basic answer</button><button data-m="advanced">Advanced answer</button></div>
+          <select id="model" aria-label="Model"><option value="1">Fast model</option><option value="1.5" selected>Standard model</option><option value="2.5">Deep model</option></select>
+        </div>
+        <div class="row"><select id="kind" aria-label="Type of work"><option value="quick">Quick answer</option><option value="essay">Essay</option><option value="research">Research / literature review</option><option value="science">Science and lab work</option><option value="calc">Calculations and problem solving</option><option value="case">Case study</option><option value="report">Assignment / report</option><option value="summary">Summary of a text</option><option value="image">Image or diagram question</option></select>
+          <label class="btn ghost" for="img" style="padding:4px 10px">Add image</label><input type="file" id="img" accept="image/*" hidden><span class="cost" id="imgname"></span></div>
+        <textarea id="q" placeholder="Type your question. Use $x^2$ for math."></textarea>
+        <div class="row"><span class="cost">Estimated cost: <b id="est">0</b> credits</span><button class="btn" id="ask" style="margin-left:auto">Get answer</button></div>
+        <div class="row tools"><button class="btn ghost" data-t="brainstorm">Brainstorm</button><button class="btn ghost" data-t="audit">Review and audit</button></div>
+        <p class="note">Credits and purchases run in demo mode until connected to your backend.</p>
+      </section>
+      <section class="card">
+        <h2>Answer workspace</h2>
+        <div class="row tools"><button class="btn ghost" id="expand">Expand answer more</button></div>
+        <div class="paper" id="paper" contenteditable="true"><p class="empty">Your answer appears here. Use Expand answer more to go deeper.</p></div>
+        <div class="row noprint"><span class="cost">Export</span><button class="btn ghost" id="pdf">PDF</button><button class="btn ghost" id="doc">Word</button></div>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="modal" id="store"><div class="card"><h2>AutoCAD Units</h2><p>Special bundle: <b style="color:var(--gold)">500 units for ₦1,000</b> (₦2.00 per unit).</p><div class="row"><button class="btn" id="pay">Buy for ₦1,000</button><button class="btn ghost" data-close>Cancel</button></div><p class="note">Demo mode: no payment is taken yet. Connect Paystack to charge real payments.</p></div></div>
+<div class="modal" id="dup"><div class="card"><h2>Similar question detected within your department.</h2><p>Another student asked something close to this. Rephrase it so your answer is unique to you.</p><div class="row"><button class="btn" id="remodel">Rephrase uniquely</button><button class="btn ghost" id="go">Ask anyway</button><button class="btn ghost" data-close>Cancel</button></div></div></div>
+<div class="modal" id="login"><div class="card"><h2 id="lt">Log in to QuikAz</h2><div class="row"><input id="le" type="email" placeholder="Email" autocomplete="email"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"></div><div class="row"><button class="btn" id="lgo">Log in</button><button class="btn ghost" id="lsw">Create account</button><button class="btn ghost" data-close>Close</button></div><p class="note" id="lm"></p></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="quikaz.js"></script>
+</body>
+</html>
