@@ -29,6 +29,7 @@ async function callAI(p){
  if(r&&r.status!==404){const d=await r.json().catch(()=>({}));throw new Error(d.error||'The AI is unavailable. Try again.')}
  return {answer:`## ${{brainstorm:'Topic ideas',audit:'Review and audit'}[p.task]||'Answer'}\n\nDemo answer. Connect a backend to get real responses. Inline math works: the quadratic formula is $x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}$.\n\n$$E=mc^2$$\n\n| Item | Detail |\n|---|---|\n| Mode | ${p.mode} |\n| Model weight | ${p.model} |\n\n- Point one\n- Point two\n\n**Your input:** ${(p.text||'').slice(0,200)}`}}
 // Small markdown renderer (headings, bold, italic, lists, tables). Math is kept for KaTeX.
+const rtl=el=>el.querySelectorAll('p,li,h1,h2,h3,td,th').forEach(e=>e.dir='auto');
 const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const inl=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|\s)_(.+?)_/g,'$1<i>$2</i>');
 function md(t){const L=t.split('\n');let o='',i=0;
@@ -38,14 +39,14 @@ function md(t){const L=t.split('\n');let o='',i=0;
   if(/^- /.test(l)){o+='<ul>';while(/^- /.test(L[i]||'')){o+='<li>'+inl(L[i].slice(2))+'</li>';i++}o+='</ul>';continue}
   const h=l.match(/^(#{1,3}) (.*)/);if(h)o+=`<h${h[1].length}>${inl(h[2])}</h${h[1].length}>`;else if(l.trim())o+='<p>'+inl(l)+'</p>';i++}
  return o}
-function show(t){const p=$('#paper');p.innerHTML=md(t);
+function show(t){const p=$('#paper');p.innerHTML=md(t);rtl(p);
  if(window.renderMathInElement)renderMathInElement(p,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})}
-function append(t){const p=$('#paper');if(p.querySelector('.empty'))p.innerHTML='';const d=document.createElement('div');d.innerHTML=md(t);p.appendChild(d);
+function append(t){const p=$('#paper');if(p.querySelector('.empty'))p.innerHTML='';const d=document.createElement('div');d.innerHTML=md(t);rtl(d);p.appendChild(d);
  if(window.renderMathInElement)renderMathInElement(d,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})}
 async function run(task,text,rep,force,q){const cost=est(text);
  if(!S.live&&S.credits<cost)return toast('Not enough credits. This needs '+cost+'.');
  $('#ask').disabled=true;$('#busy').hidden=false;
- try{const res=await callAI({task,text,q:q||text,force:!!force,mode:S.mode,model:$('#model').value,kind:$('#kind').value,level:$('#level').value,img:S.img,dept:S.dept,ocr:S.ocr});
+ try{const res=await callAI({task,text,q:q||text,force:!!force,mode:S.mode,model:$('#model').value,kind:$('#kind').value,level:$('#level').value,tone:$('#tone').value,lang:$('#lang').value,img:S.img,dept:S.dept,ocr:S.ocr});
   if(res.credits!==undefined){S.live=true;S.credits=res.credits}else S.credits-=cost;
   save();paint();rep?append(res.answer):show(res.answer);remember(text);toast('Done. '+cost+' credits used.')}
  catch(e){if(e.dup){pending=q||text;$('#dup').classList.add('open')}else toast(e.message||'Something went wrong.')}
@@ -58,6 +59,7 @@ $('#go').onclick=()=>{$('#dup').classList.remove('open');ask(true)};
 $('#remodel').onclick=()=>{$('#dup').classList.remove('open');const t=pending+'\n\nAnswer with a unique structure, wording and examples.';$('#q').value=t;run('answer',t,false,true,pending)};
 $$('[data-t]').forEach(b=>b.onclick=()=>{const t=$('#q').value.trim();if(!t)return toast('Type a topic or paste an answer first.');run(b.dataset.t,t)});
 $('#expand').onclick=()=>{const p=$('#paper');if(p.querySelector('.empty'))return toast('Get an answer first.');run('expand','Expand this answer in much more depth, keeping the same structure:\n\n'+p.innerText,true)};
+$('#trans').onclick=()=>{const p=$('#paper');if(p.querySelector('.empty'))return toast('Get an answer first.');run('translate',p.innerText,true)};
 $('#modes').onclick=e=>{if(e.target.dataset.m){S.mode=e.target.dataset.m;save();paint()}};
 $('#model').onchange=paint;$('#kind').onchange=paint;$('#q').oninput=paint;
 $('#dept').onchange=e=>{S.dept=e.target.value.trim();save()};

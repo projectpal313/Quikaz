@@ -37,6 +37,8 @@
         </div>
         <div class="row"><select id="kind" aria-label="Type of work"><option value="quick">Quick answer</option><option value="teach">Teach me (help me understand)</option><option value="essay">Essay</option><option value="research">Research / literature review</option><option value="science">Science and lab work</option><option value="calc">Calculations and problem solving</option><option value="case">Case study</option><option value="report">Assignment / report</option><option value="summary">Summary of a text</option><option value="image">Image or diagram question</option></select>
           <select id="level" aria-label="Your level"><option value="100">100 level</option><option value="200">200 level</option><option value="300">300 level</option><option value="400">400 level</option><option value="500">500 level</option></select>
+          <select id="tone" aria-label="Tone"><option value="9ja">Simple English (9ja)</option><option value="foreign">Advanced English (Foreign)</option></select>
+          <select id="lang" aria-label="Answer language"><option value="English">English</option><optgroup label="Nigerian"><option value="Yoruba">Yoruba</option><option value="Igbo">Igbo</option><option value="Hausa">Hausa</option><option value="Nigerian Pidgin">Nigerian Pidgin</option></optgroup><optgroup label="Foreign"><option value="Mandarin Chinese">Mandarin Chinese</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option><option value="Portuguese">Portuguese</option><option value="Arabic">Arabic</option><option value="Hebrew">Hebrew</option><option value="Greek">Greek</option><option value="Hindi">Hindi</option><option value="Russian">Russian</option><option value="Japanese">Japanese</option><option value="Korean">Korean</option><option value="Swahili">Swahili</option><option value="Italian">Italian</option><option value="Turkish">Turkish</option></optgroup></select>
           <label class="btn ghost" for="img" style="padding:4px 10px">Add image</label><input type="file" id="img" accept="image/*" hidden><button class="btn ghost" id="mic" type="button" style="padding:4px 10px">Speak</button><span class="cost" id="imgname"></span></div>
         <textarea id="q" placeholder="Type your question. Use $x^2$ for math."></textarea>
         <div class="row"><span class="cost">Estimated cost: <b id="est">0</b> credits</span><button class="btn" id="ask" style="margin-left:auto">Get answer</button></div>
@@ -45,9 +47,9 @@
       </section>
       <section class="card">
         <h2>Answer workspace</h2>
-        <div class="row tools"><button class="btn ghost" id="expand">Expand answer more</button></div>
+        <div class="row tools"><button class="btn ghost" id="expand">Expand answer more</button><button class="btn ghost" id="trans">Translate answer</button></div>
         <div class="busy" id="busy" hidden role="status"><span class="dots"><i></i><i></i><i></i></span> QuikAz is preparing your answer…</div>
-        <div class="paper" id="paper" contenteditable="true"><p class="empty">Your answer appears here. Use Expand answer more to go deeper.</p></div>
+        <div class="paper" id="paper" dir="auto" contenteditable="true"><p class="empty">Your answer appears here. Use Expand answer more to go deeper.</p></div>
         <div class="row noprint"><span class="cost">Export</span><button class="btn ghost" id="pdf">PDF</button><button class="btn ghost" id="doc">Word</button></div>
       </section>
     </main>
