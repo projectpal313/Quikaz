@@ -1,7 +1,11 @@
 // QuikAz AI function. Keeps your AI keys secret on the server.
 // QuikAz only. QUIKAZ_PROVIDER = gemini (default) or claude. Keys: QUIKAZ_GEMINI_KEY and QUIKAZ_CLAUDE_KEY.
 const MODELS = { '1': 'claude-haiku-4-5-20251001', '1.5': 'claude-sonnet-5-5', '2.5': 'claude-opus-5-5' };
-const GEMINI = { '1': 'gemini-2.5-flash-lite', '1.5': 'gemini-2.5-flash', '2.5': 'gemini-2.5-pro' };
+const GEMINI = {
+  '1': ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'],
+  '1.5': ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'],
+  '2.5': ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+};
 const SB = process.env.SUPABASE_URL || 'https://qhcponrxumfnomkgverb.supabase.co';
 const ANON = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoY3BvbnJ4dW1mbm9ta2d2ZXJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMDMyNzUsImV4cCI6MjEwNTc3OTI3NX0.PWiYx_f-yPLgdCQRz12cU4IazliOhb6W7klWTnGqT_U';
 const KIND = {
@@ -47,15 +51,24 @@ export default async (req) => {
       const d = await r.json();
       answer = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     } else {
-      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + (GEMINI[p.model] || GEMINI['1.5']) + ':generateContent', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.QUIKAZ_GEMINI_KEY || '' },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { maxOutputTokens: maxTokens } })
-      });
-      if (r.status === 429) return json({ error: 'QuikAz is busy right now. Wait a minute and try again.' }, 429);
-      if (!r.ok) throw new Error('gemini ' + r.status);
-      const d = await r.json();
-      answer = (((d.candidates || [])[0] || {}).content || { parts: [] }).parts.map(x => x.text || '').join('\n');
+      let last = '';
+      for (const m of GEMINI[p.model] || GEMINI['1.5']) {
+        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.QUIKAZ_GEMINI_KEY || '' },
+          body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { maxOutputTokens: maxTokens } })
+        });
+        if (r.status === 429) return json({ error: 'QuikAz is busy right now. Wait a minute and try again.' }, 429);
+        if (r.ok) {
+          const d = await r.json();
+          answer = (((d.candidates || [])[0] || {}).content || { parts: [] }).parts.map(x => x.text || '').join('\n');
+          break;
+        }
+        const e = await r.json().catch(() => ({}));
+        last = r.status + ': ' + String((e.error || {}).message || '').slice(0, 140);
+        if (/key/i.test(last)) break;
+      }
+      if (!answer && last) return json({ error: 'The AI is not available (Google said ' + last + ')' }, 502);
     }
   } catch (e) { return json({ error: 'The AI is not available right now. Try again soon.' }, 502); }
   if (!answer.trim()) return json({ error: 'The AI gave no answer. Try rephrasing.' }, 502);
