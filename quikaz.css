@@ -49,3 +49,7 @@ textarea{width:100%;min-height:180px;background:var(--bg);border:1px solid var(-
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 @media print{body{background:#fff;color:#000}.side,.top,#studio,.tools,.noprint,.toast{display:none!important}.app,main{display:block;padding:0}.card{border:0;box-shadow:none;background:none;padding:0}.paper{font:12pt/1.5 'Times New Roman',serif;color:#000}.paper h1,.paper h2,.paper h3{color:#000}@page{margin:1in}}
 .card input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+.busy{display:flex;align-items:center;gap:12px;color:var(--gold);padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin:8px 0}.busy[hidden]{display:none}
+.dots{display:inline-flex;gap:6px}.dots i{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:bl 1.2s infinite ease-in-out}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
+@media(prefers-reduced-motion:reduce){.dots i{animation:none;opacity:1}}
