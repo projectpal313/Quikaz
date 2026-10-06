@@ -2,13 +2,13 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 let S={credits:150,cad:0,mode:'basic',dept:'',img:false,ocr:''};
 try{Object.assign(S,JSON.parse(localStorage.getItem('qz_state')||'{}'))}catch(e){}
-delete S.live;delete S.demo;
-const save=()=>{try{const {live,demo,...r}=S;localStorage.setItem('qz_state',JSON.stringify(r))}catch(e){}};
+delete S.live;delete S.demo;delete S.img;delete S.imgData;delete S.ocr;
+const save=()=>{try{const {live,demo,img,imgData,ocr,...r}=S;localStorage.setItem('qz_state',JSON.stringify(r))}catch(e){}};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2600)};
 function paint(){const ok=S.live||S.demo;$('#cr').textContent=ok?S.credits:'—';$('#cad').textContent=ok?S.cad:'—';$('#dept').value=S.dept;
  $$('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));$('#est').textContent=est()}
 // Cost: words in the prompt + answer depth + model + image
-function est(text){text=text===undefined?$('#q').value:text;const w=text.trim().split(/\s+/).filter(Boolean).length;
+function est(text){text=text===undefined?$('#q').value:text;if(!text.trim()&&S.img)text='Solve this image';const w=text.trim().split(/\s+/).filter(Boolean).length;
  if(!w)return 0;return Math.max(1,Math.ceil((Math.ceil(w/40)+(S.mode==='advanced'?6:2)+(S.img?3:0)+({quick:0,summary:1,teach:3,calc:2,science:3,image:3,essay:4,case:4,report:5,research:6}[$('#kind').value]||0))*parseFloat($('#model').value)))}
 // Departmental duplicate check (demo store in this browser; move to Supabase for real cross-student checks)
 const words=t=>t.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(w=>w.length>2);
@@ -46,13 +46,13 @@ function append(t){const p=$('#paper');if(p.querySelector('.empty'))p.innerHTML=
 async function run(task,text,rep,force,q){const cost=est(text);
  if(!S.live&&S.credits<cost)return toast('Not enough credits. This needs '+cost+'.');
  $('#ask').disabled=true;$('#busy').hidden=false;
- try{const res=await callAI({task,text,q:q||text,force:!!force,mode:S.mode,model:$('#model').value,kind:$('#kind').value,level:$('#level').value,tone:$('#tone').value,lang:$('#lang').value,img:S.img,dept:S.dept,ocr:S.ocr});
+ try{const res=await callAI({task,text,q:q||text,force:!!force,mode:S.mode,model:$('#model').value,kind:$('#kind').value,level:$('#level').value,tone:$('#tone').value,lang:$('#lang').value,img:task==='answer'&&S.img,image:task==='answer'&&S.imgData?{mime:'image/jpeg',data:S.imgData}:null,dept:S.dept,ocr:S.ocr});
   if(res.credits!==undefined){S.live=true;S.credits=res.credits}else S.credits-=cost;
   save();paint();rep?append(res.answer):show(res.answer);remember(text);toast('Done. '+cost+' credits used.')}
  catch(e){if(e.dup){pending=q||text;$('#dup').classList.add('open')}else toast(e.message||'Something went wrong.')}
  finally{$('#ask').disabled=false;$('#busy').hidden=true}}
 let pending='';
-function ask(force){const t=$('#q').value.trim();if(!t)return toast('Type a question first.');
+function ask(force){const t=$('#q').value.trim();if(!t&&!S.imgData)return toast('Type a question or add an image first.');
  if(!force&&similar(t)){pending=t;return $('#dup').classList.add('open')}run('answer',t,false,force,t)}
 $('#ask').onclick=()=>ask(false);
 $('#go').onclick=()=>{$('#dup').classList.remove('open');ask(true)};
@@ -63,11 +63,16 @@ $('#trans').onclick=()=>{const p=$('#paper');if(p.querySelector('.empty'))return
 $('#modes').onclick=e=>{if(e.target.dataset.m){S.mode=e.target.dataset.m;save();paint()}};
 $('#model').onchange=paint;$('#kind').onchange=paint;$('#q').oninput=paint;
 $('#dept').onchange=e=>{S.dept=e.target.value.trim();save()};
-// Image + OCR (loads the OCR library only when needed)
-$('#img').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.img=true;$('#imgname').textContent=f.name;paint();toast('Reading text from image…');
- try{if(!window.Tesseract)await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.5/tesseract.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});
-  const r=await Tesseract.recognize(f,'eng');S.ocr=r.data.text;$('#q').value+=(($('#q').value?'\n':'')+r.data.text.trim());paint();toast('Text added from image.')}
- catch(err){toast('Could not read the image. Type the text instead.')}};
+// Image: shrink it, then send it straight to the AI so it can see it
+const clearImg=()=>{S.img=false;S.imgData=null;$('#img').value='';$('#imgbox').hidden=true;$('#thumb').removeAttribute('src');$('#imgname').textContent='';paint()};
+$('#imgx').onclick=clearImg;
+$('#img').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!/^image\//.test(f.type))return toast('Please choose an image.');
+ const im=new Image(),u=URL.createObjectURL(f);
+ im.onerror=()=>{clearImg();toast('Could not open that image. Try another.')};
+ im.onload=()=>{const s=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);S.imgData=c.toDataURL('image/jpeg',.8).split(',')[1];S.img=true;
+  $('#thumb').src=u;$('#imgname').textContent=f.name;$('#imgbox').hidden=false;paint()};
+ im.src=u};
 // Voice typing (the browser asks for microphone permission once)
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,rOn=false;
 const mathify=t=>t.replace(/\bsquare root of\b/gi,'√').replace(/\bdivided by\b/gi,'÷').replace(/\bto the power of\b/gi,'^').replace(/\btimes\b/gi,'×').replace(/\bplus\b/gi,'+').replace(/\bminus\b/gi,'-').replace(/\bequals\b/gi,'=').replace(/\bsquared\b/gi,'²').replace(/\bcubed\b/gi,'³');
