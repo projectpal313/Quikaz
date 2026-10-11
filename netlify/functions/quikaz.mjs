@@ -19,7 +19,7 @@ const KIND = {
   case: 'Analyse the case: context, issues, options and a recommendation.',
   report: 'Write in a clear academic report style with headings that fit the topic.',
   summary: 'Summarise the text accurately and briefly.',
-  image: 'The text was read from a student\'s image of notes or a diagram. Interpret it and answer.'
+  image: 'The student asked about an image of notes, a question or a diagram. Interpret it and answer.'
 };
 const KCOST = { quick: 0, summary: 1, calc: 2, teach: 3, science: 3, image: 3, essay: 4, case: 4, report: 5, research: 6 };
 const TASK = {
@@ -51,12 +51,12 @@ async function wallet(uid) {
   if (!w) { await rest('quikaz_wallets', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates' }, body: JSON.stringify({ user_id: uid }) }); w = await get(); }
   return w;
 }
-async function callAI(p, text, system, maxTokens) {
+async function callAI(p, text, system, maxTokens, image) {
   if ((process.env.QUIKAZ_PROVIDER || 'gemini').toLowerCase() === 'claude') {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': process.env.QUIKAZ_CLAUDE_KEY || '', 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODELS[p.model] || MODELS['1.5'], max_tokens: maxTokens, temperature: 1, system, messages: [{ role: 'user', content: text }] })
+      body: JSON.stringify({ model: MODELS[p.model] || MODELS['1.5'], max_tokens: maxTokens, temperature: 1, system, messages: [{ role: 'user', content: image ? [{ type: 'image', source: { type: 'base64', media_type: image.mime, data: image.data } }, { type: 'text', text }] : text }] })
     });
     if (!r.ok) throw new Error('The AI is not available (claude ' + r.status + ')');
     return ((await r.json()).content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
@@ -66,7 +66,7 @@ async function callAI(p, text, system, maxTokens) {
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.QUIKAZ_GEMINI_KEY || '' },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { maxOutputTokens: maxTokens, temperature: 1 } })
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: image ? [{ inlineData: { mimeType: image.mime, data: image.data } }, { text }] : [{ text }] }], generationConfig: { maxOutputTokens: maxTokens, temperature: 1 } })
     });
     if (r.status === 429) throw Object.assign(new Error('QuikAz is busy right now. Wait a minute and try again.'), { code: 429 });
     if (r.ok) { const d = await r.json(); return (((d.candidates || [])[0] || {}).content || { parts: [] }).parts.map(x => x.text || '').join('\n'); }
@@ -89,7 +89,10 @@ export default async (req) => {
   if (!w) return json({ error: 'Could not load your credits. Try again.' }, 500);
   if (p.task === 'wallet') return json({ credits: w.credits, cad: w.cad_units });
 
-  const text = String(p.text || '').slice(0, 12000);
+  const image = p.image && /^image\/(jpeg|png|webp)$/.test(p.image.mime) && typeof p.image.data === 'string' && p.image.data.length < 4500000 ? p.image : null;
+  let text = String(p.text || '').slice(0, 12000);
+  if (!text.trim() && image) text = 'Solve or explain what is in this image.';
+  p.img = !!image;
   if (!text.trim()) return json({ error: 'Type a question first.' }, 400);
   const price = cost(p, text);
   if (w.credits < price) return json({ error: 'Not enough credits. This needs ' + price + '.', credits: w.credits }, 402);
@@ -97,7 +100,7 @@ export default async (req) => {
   // Similar question from another student in the same department and level?
   const dept = String(p.dept || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 80);
   const q = String(p.q || text).slice(0, 4000), mine = sig(q), level = String(p.level || '');
-  if (p.task === 'answer' && dept && !p.force && mine.length >= 3) {
+  if (p.task === 'answer' && dept && !p.force && !image && mine.length >= 3) {
     const since = new Date(Date.now() - 60 * 864e5).toISOString();
     const rows = await (await rest('quikaz_queries?department=eq.' + encodeURIComponent(dept) + '&level=eq.' + encodeURIComponent(level) + '&user_id=neq.' + uid + '&created_at=gte.' + since + '&select=sig&order=created_at.desc&limit=500')).json().catch(() => []);
     const a = new Set(mine);
@@ -110,15 +113,16 @@ export default async (req) => {
   const system = 'You are QuikAz, an academic assistant for university students. ' + (KIND[p.kind] || KIND.quick) + ' ' + (TASK[p.task] || '') +
     (p.mode === 'advanced' ? ' Be in-depth with background context.' : ' Be concise and direct.') +
     ' The student is in ' + (p.level || '100') + ' level, so match the depth and vocabulary. ' + (TONES[p.tone] ? TONES[p.tone] + ' ' : '') + langLine + STYLES[Math.floor(Math.random() * STYLES.length)] +
+    (image ? ' The student attached an image. Read it carefully, including handwriting and diagrams. Briefly say what you see, then solve or answer it.' : '') +
     ' Use your own wording, structure and examples so no two students get the same text. Match the length and format to the type of work; if the question is easy, keep the answer simple. Use Markdown only when it helps: headings for long answers, tables only for real comparisons. Only use maths notation when the question is mathematical; otherwise include no formulas or equations. When you do use maths, write it in LaTeX between $ signs. Never invent citations. Help the student understand.';
   let answer = '';
-  try { answer = await callAI(p, text, system, Math.round((p.mode === 'advanced' || p.task === 'expand' ? 3000 : 1500) * (lang !== 'English' ? 1.5 : 1))); }
+  try { answer = await callAI(p, text, system, Math.round((p.mode === 'advanced' || p.task === 'expand' ? 3000 : 1500) * (lang !== 'English' ? 1.5 : 1)), image); }
   catch (e) { return json({ error: e.message || 'The AI is not available right now.' }, e.code === 429 ? 429 : 502); }
   if (!answer.trim()) return json({ error: 'The AI gave no answer. Try rephrasing.' }, 502);
 
   // Charge only after a successful answer, then remember the question
   const left = w.credits - price;
   await rest('quikaz_wallets?user_id=eq.' + uid, { method: 'PATCH', body: JSON.stringify({ credits: left, updated_at: new Date().toISOString() }) });
-  if (p.task === 'answer' && dept && mine.length) await rest('quikaz_queries', { method: 'POST', body: JSON.stringify({ user_id: uid, department: dept, level, sig: mine }) });
+  if (p.task === 'answer' && dept && mine.length && !image) await rest('quikaz_queries', { method: 'POST', body: JSON.stringify({ user_id: uid, department: dept, level, sig: mine }) });
   return json({ answer, credits: left, cost: price });
 };
